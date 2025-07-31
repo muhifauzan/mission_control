@@ -1,4 +1,25 @@
 defmodule MissionControl.FuelServer do
+  @moduledoc """
+  A GenServer that calculates fuel requirements for space missions.
+
+  Supports fuel calculations for launching from and landing on Earth, Moon, and Mars.
+  The service calculates both base fuel requirements and additional fuel needed to
+  carry that fuel, recursively until no additional fuel is required.
+
+  ## Formulas
+
+  - Launch: `mass * gravity * 0.042 - 33` (rounded down)
+  - Landing: `mass * gravity * 0.033 - 42` (rounded down)
+
+  ## Examples
+
+      iex> MissionControl.FuelServer.calculate_fuel(28801, "land", "earth")
+      {:ok, 13447}
+
+      iex> MissionControl.FuelServer.calculate_fuel(1000, "launch", "unknown")
+      {:error, {:planet_not_supported, "unknown"}}
+  """
+
   use GenServer
 
   defstruct [:planets]
@@ -9,10 +30,55 @@ defmodule MissionControl.FuelServer do
           }
         }
 
+  @type action :: String.t()
+  @type mass :: number()
+  @type planet :: String.t()
+
+  @type fuel_result ::
+          {:ok, non_neg_integer()}
+          | {:error, {:planet_not_supported | :action_not_supported, term()}}
+
+  @doc """
+  Starts the FuelServer GenServer.
+
+  ## Options
+
+  - `:planets` - Additional planets with their gravity values (optional)
+
+  ## Examples
+
+      MissionControl.FuelServer.start_link()
+      MissionControl.FuelServer.start_link(planets: %{"jupiter" => 24.79})
+  """
+  @spec start_link(keyword()) :: GenServer.on_start()
   def start_link(args \\ []) do
     GenServer.start_link(__MODULE__, args, name: __MODULE__)
   end
 
+  @doc """
+  Calculates the total fuel required for a space mission action.
+
+  ## Parameters
+
+  - `mass` - The mass of the spacecraft in kg
+  - `action` - Either "launch" or "land"
+  - `planet` - The target planet ("earth", "moon", or "mars")
+
+  ## Returns
+
+  - `{:ok, fuel_amount}` - The total fuel required in kg
+  - `{:error, {:planet_not_supported, planet}}` - Unknown planet
+  - `{:error, {:action_not_supported, action}}` - Invalid action
+
+  ## Examples
+
+      iex> calculate_fuel(28801, "land", "earth")
+      {:ok, 13447}
+
+      iex> calculate_fuel(1000, "takeoff", "earth")
+      {:error, {:action_not_supported, "takeoff"}}
+  """
+  @spec calculate_fuel(mass(), action(), planet()) :: fuel_result()
   def calculate_fuel(mass, action, planet) do
     GenServer.call(__MODULE__, {:calculate_fuel, mass, action, planet})
   end
