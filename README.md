@@ -78,6 +78,26 @@ flight_path = [
 
 ## Architecture & Fault Tolerance
 
+### Security Considerations
+
+**String Actions vs Atom Actions**: While the NASA specification shows Elixir examples using atoms (`:launch`, `:land`), this implementation deliberately uses strings (`"launch"`, `"land"`) for security reasons:
+
+```elixir
+# ❌ Specification example (security risk with user input)
+28801, [{:launch, "earth"}, {:land, "moon"}]
+
+# ✅ Our secure implementation
+28801, [{"launch", "earth"}, {"land", "moon"}]
+```
+
+**Why strings are safer:**
+- **Atom exhaustion protection**: Atoms aren't garbage collected and have a ~1M limit
+- **DoS attack prevention**: Malicious users can't crash the VM by creating unlimited atoms
+- **Input validation**: String pattern matching prevents atom table pollution
+- **Mission-critical reliability**: NASA systems must be immune to resource exhaustion attacks
+
+This design choice prioritizes system security and reliability over strict specification compliance.
+
 ### Supervision Strategy
 
 The application uses OTP's supervision principles for maximum reliability:
